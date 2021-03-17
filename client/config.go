@@ -1,4 +1,4 @@
-package utils
+package client
 
 type FlowRC struct {
 	Context   string `json:"context"`
