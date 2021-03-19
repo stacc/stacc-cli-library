@@ -174,7 +174,11 @@ func (c *Client) Watch(listOptions metav1.ListOptions, f func(*v1.Pod, watch.Eve
 	for {
 		podData := <-pods.ResultChan()
 		podObject := podData.Object
-		pod := podObject.(*v1.Pod)
+		pod, ok := podObject.(*v1.Pod)
+		if !ok {
+			continue;
+		}
+		
 		err = f(pod, podData.Type)
 		if err != nil {
 			return err
