@@ -9,6 +9,8 @@ import (
 )
 
 type TaskBuilder struct {
+	Silence bool // silences all console output
+
 	tasks []task
 }
 
@@ -20,7 +22,7 @@ type task struct {
 }
 
 func NewTaskBuilder() TaskBuilder {
-	return TaskBuilder{}
+	return TaskBuilder{Silence: false}
 }
 
 func (tb TaskBuilder) AddTask(title string, skipFunc func(context map[string]interface{}) (bool, string), runFunc func(context map[string]interface{}) error) TaskBuilder {
@@ -39,7 +41,7 @@ func (tb TaskBuilder) AddTask(title string, skipFunc func(context map[string]int
 func (tb TaskBuilder) Run() (map[string]interface{}, error) {
 	ctx := make(map[string]interface{})
 	for _, task := range tb.tasks {
-		err := task.run(ctx)
+		err := task.run(ctx, tb.Silence)
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +51,7 @@ func (tb TaskBuilder) Run() (map[string]interface{}, error) {
 }
 
 // FIXME: There's a chance to get a spinner on a completed task
-func (t task) run(ctx map[string]interface{}) error {
+func (t task) run(ctx map[string]interface{}, silence bool) error {
 	if t.runFunc == nil {
 		return fmt.Errorf("task: runFunc is nil")
 	}
@@ -57,7 +59,9 @@ func (t task) run(ctx map[string]interface{}) error {
 	if t.skipFunc != nil {
 		shouldSkip, message := t.skipFunc(ctx)
 		if shouldSkip {
-			t.skip(message)
+			if !silence {
+				t.skip(message)
+			}
 			return nil
 		}
 	}
@@ -70,8 +74,10 @@ func (t task) run(ctx map[string]interface{}) error {
 			case <-t.stop:
 				return
 			default:
-				yellow.Printf("\r  %s ", spinner.Next())
-				fmt.Print(t.title)
+				if !silence {
+					fmt.Print(yellow.Sprintf("\r  %s ", spinner.Next()))
+					fmt.Print(t.title)
+				}
 				time.Sleep(100 * time.Millisecond)
 			}
 		}
@@ -80,35 +86,39 @@ func (t task) run(ctx map[string]interface{}) error {
 	err := t.runFunc(ctx)
 	t.stop <- 0
 	if err != nil {
-		t.fail(err)
+		if !silence {
+			t.fail(err)
+		}
 		return err
 	}
 
-	t.complete()
+	if !silence {
+		t.complete()
+	}
 	return nil
 }
 
 func (t task) complete() {
 	green := color.New(color.FgGreen)
-	green.Print("\r  ✔ ")
+	fmt.Print(green.Sprint("\r  ✔ "))
 	fmt.Println(t.title)
 }
 
 func (t task) fail(err error) {
 	red := color.New(color.FgRed)
-	red.Print("\r  ✘ ")
+	fmt.Print(red.Sprint("\r  ✘ "))
 	fmt.Println(t.title)
 	grey := color.New(color.FgHiBlack)
-	grey.Printf("    ↪ %s\n", err.Error())
+	fmt.Print(grey.Sprintf("    ↪ %s\n", err.Error()))
 }
 
 func (t task) skip(message string) {
 	yellow := color.New(color.FgYellow)
-	yellow.Print("\r  ⮎ ")
+	fmt.Print(yellow.Sprint("\r  ⮎ "))
 	fmt.Print(t.title)
 	grey := color.New(color.FgHiBlack)
-	grey.Println(" [skipped]")
+	fmt.Println(grey.Sprint(" [skipped]"))
 	if message != "" {
-		grey.Printf("    ↪ %s\n", message)
+		fmt.Print(grey.Sprintf("    ↪ %s\n", message))
 	}
 }
