@@ -176,9 +176,9 @@ func (c *Client) Watch(listOptions metav1.ListOptions, f func(*v1.Pod, watch.Eve
 		podObject := podData.Object
 		pod, ok := podObject.(*v1.Pod)
 		if !ok {
-			continue;
+			continue
 		}
-		
+
 		err = f(pod, podData.Type)
 		if err != nil {
 			return err
@@ -232,17 +232,41 @@ type ProxyClient struct {
 	restclient restclient.Interface
 	server     string
 	Namespace  string
-	PodName    string
+	Name       string
+	Resource   string
 }
 
 // Create a proxy allowing you to proxy HTTP requests to a given pod
-func (c *Client) Proxy(namespace string, podName string) *ProxyClient {
+func (c *Client) Proxy(namespace, resource, name string) *ProxyClient {
 	return &ProxyClient{
 		config:     c.restclient,
 		restclient: c.RESTClient(),
 		server:     c.Clusters[c.Contexts[c.GetCurrentContext()].Cluster].Server,
 		Namespace:  namespace,
-		PodName:    podName,
+		Name:       name,
+		Resource:   resource,
+	}
+}
+
+func (c *Client) ProxyPod(namespace, podName string) *ProxyClient {
+	return &ProxyClient{
+		config:     c.restclient,
+		restclient: c.RESTClient(),
+		server:     c.Clusters[c.Contexts[c.GetCurrentContext()].Cluster].Server,
+		Namespace:  namespace,
+		Name:       podName,
+		Resource:   "pods",
+	}
+}
+
+func (c *Client) ProxyService(namespace, serviceName string) *ProxyClient {
+	return &ProxyClient{
+		config:     c.restclient,
+		restclient: c.RESTClient(),
+		server:     c.Clusters[c.Contexts[c.GetCurrentContext()].Cluster].Server,
+		Namespace:  namespace,
+		Name:       serviceName,
+		Resource:   "services",
 	}
 }
 
@@ -257,7 +281,7 @@ func setAdditionalRequestHeaders(req *rest.Request, additionalHeaders map[string
 }
 
 func (p *ProxyClient) Get(endpoint string, additionalHeaders map[string]string) restclient.Result {
-	req := p.restclient.Get().Resource("pods").Namespace(p.Namespace).Name(p.PodName).SubResource("proxy").Suffix(endpoint)
+	req := p.restclient.Get().Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint)
 	setAdditionalRequestHeaders(req, additionalHeaders)
 
 	return req.Do(context.TODO())
@@ -265,21 +289,21 @@ func (p *ProxyClient) Get(endpoint string, additionalHeaders map[string]string) 
 
 func (p *ProxyClient) Put(endpoint string, body interface{}, additionalHeaders map[string]string) restclient.Result {
 	// FIXME: Throttle should not be forced to nil here
-	req := p.restclient.Put().Throttle(nil).Resource("pods").Namespace(p.Namespace).Name(p.PodName).SubResource("proxy").Suffix(endpoint).Body(body)
+	req := p.restclient.Put().Throttle(nil).Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).Body(body)
 	setAdditionalRequestHeaders(req, additionalHeaders)
 
 	return req.Do(context.TODO())
 }
 
 func (p *ProxyClient) Post(endpoint string, body interface{}, additionalHeaders map[string]string) restclient.Result {
-	req := p.restclient.Post().Resource("pods").Namespace(p.Namespace).Name(p.PodName).SubResource("proxy").Suffix(endpoint).Body(body)
+	req := p.restclient.Post().Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).Body(body)
 	setAdditionalRequestHeaders(req, additionalHeaders)
 
 	return req.Do(context.TODO())
 }
 
 func (p *ProxyClient) Delete(endpoint string, additionalHeaders map[string]string) restclient.Result {
-	req := p.restclient.Delete().Resource("pods").Namespace(p.Namespace).Name(p.PodName).SubResource("proxy").Suffix(endpoint)
+	req := p.restclient.Delete().Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint)
 	setAdditionalRequestHeaders(req, additionalHeaders)
 
 	return req.Do(context.TODO())
