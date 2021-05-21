@@ -227,6 +227,11 @@ func (c *Client) GetCurrentNamespace() string {
 	return c.Contexts[c.GetCurrentContext()].Namespace
 }
 
+// Get the name of the current cluster from .kubeconfig or .flowrc
+func (c *Client) GetCurrentCluster() string {
+	return c.Contexts[c.GetCurrentContext()].Cluster
+}
+
 type ProxyClient struct {
 	config     *restclient.Config
 	restclient restclient.Interface
