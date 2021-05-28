@@ -75,7 +75,7 @@ func (t task) run(ctx map[string]interface{}, silence bool) error {
 				return
 			default:
 				if !silence {
-					fmt.Print(yellow.Sprintf("\r  %s ", spinner.Next()))
+					yellow.Printf("\r  %s ", spinner.Next())
 					fmt.Print(t.title)
 				}
 				time.Sleep(100 * time.Millisecond)
@@ -99,26 +99,22 @@ func (t task) run(ctx map[string]interface{}, silence bool) error {
 }
 
 func (t task) complete() {
-	green := color.New(color.FgGreen)
-	fmt.Print(green.Sprint("\r  ✔ "))
+	color.New(color.FgGreen).Print("\r  ✔ ")
 	fmt.Println(t.title)
 }
 
 func (t task) fail(err error) {
-	red := color.New(color.FgRed)
-	fmt.Print(red.Sprint("\r  ✘ "))
+	color.New(color.FgRed).Print("\r  ✘ ")
 	fmt.Println(t.title)
-	grey := color.New(color.FgHiBlack)
-	fmt.Print(grey.Sprintf("    ↪ %s\n", err.Error()))
+	color.New(color.FgHiBlack).Print("    ↪ %s\n", err.Error())
 }
 
 func (t task) skip(message string) {
-	yellow := color.New(color.FgYellow)
-	fmt.Print(yellow.Sprint("\r  ⮎ "))
+	color.New(color.FgYellow).Print("\r  ⮎ ")
 	fmt.Print(t.title)
 	grey := color.New(color.FgHiBlack)
-	fmt.Println(grey.Sprint(" [skipped]"))
+	grey.Print(" [skipped]")
 	if message != "" {
-		fmt.Print(grey.Sprintf("    ↪ %s\n", message))
+		grey.Printf("    ↪ %s\n", message)
 	}
 }
