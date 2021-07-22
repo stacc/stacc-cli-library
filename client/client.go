@@ -28,6 +28,7 @@ import (
 
 type Client struct {
 	corev1.CoreV1Interface
+	HostV1Alpha1Interface
 	KubeconfigPath           string
 	Clusters                 map[string]*clientcmdapi.Cluster
 	AuthInfos                map[string]*clientcmdapi.AuthInfo
