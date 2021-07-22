@@ -1,4 +1,4 @@
-package client
+package hosts
 
 import (
 	hostv1 "bitbucket.org/staccas/database-controller/apis/solution/v1alpha1"

@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/stacc/stacc-cli-library/client/hosts"
 	"golang.org/x/net/websocket"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	k8s "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
@@ -28,7 +30,7 @@ import (
 
 type Client struct {
 	corev1.CoreV1Interface
-	HostV1Alpha1Interface
+	hosts.HostV1Alpha1Interface
 	KubeconfigPath           string
 	Clusters                 map[string]*clientcmdapi.Cluster
 	AuthInfos                map[string]*clientcmdapi.AuthInfo
@@ -104,6 +106,7 @@ func CreateDefaultClient() (*Client, error) {
 
 // Creates a new client for communicating with the Kubernetes cluster
 func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.ConfigOverrides) (*Client, error) {
+	hosts.AddToScheme(scheme.Scheme)
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		overrides,
@@ -119,18 +122,28 @@ func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.Co
 		return nil, err
 	}
 
+	hostRestClientConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	k8sClient, err := k8s.NewForConfig(restClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	var client *Client
-	client = new(Client)
+	hostsClient, err := hosts.NewForConfig(hostRestClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	var client *Client = new(Client)
 	client.KubeconfigPath = kubeconfigPath
 	client.Clusters = k8sConfig.Clusters
 	client.AuthInfos = k8sConfig.AuthInfos
 	client.Contexts = k8sConfig.Contexts
 	client.CoreV1Interface = k8sClient.CoreV1()
+	client.HostV1Alpha1Interface = hostsClient
 	client.kubeconfigCurrentContext = k8sConfig.CurrentContext
 	client.flowRC = flowRC
 	client.restclient = restClientConfig

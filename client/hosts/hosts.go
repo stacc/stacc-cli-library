@@ -1,4 +1,4 @@
-package client
+package hosts
 
 import (
 	"context"
@@ -21,7 +21,7 @@ type HostInterface interface {
 	Create(ctx context.Context, host *hostv1.Host, opts metav1.CreateOptions) (*hostv1.Host, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Update(ctx context.Context, host *hostv1.Host, opts metav1.UpdateOptions) (*hostv1.Host, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 }
 
 type hostClient struct {
