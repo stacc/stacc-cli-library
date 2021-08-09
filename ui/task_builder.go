@@ -106,7 +106,7 @@ func (t task) complete() {
 func (t task) fail(err error) {
 	color.New(color.FgRed).Print("\r  ✘ ")
 	fmt.Println(t.title)
-	color.New(color.FgHiBlack).Print("    ↪ %s\n", err.Error())
+	color.New(color.FgHiBlack).Printf("    ↪ %s\n", err.Error())
 }
 
 func (t task) skip(message string) {
