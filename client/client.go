@@ -26,6 +26,8 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
+// Client is used to load .kubeconfig and .flowrc files and
+// communicate with the Kubernetes API
 type Client struct {
 	corev1.CoreV1Interface
 	KubeconfigPath           string
@@ -37,7 +39,7 @@ type Client struct {
 	restclient               *restclient.Config
 }
 
-// Creates a default client for communicating with the Kubernetes cluster
+// CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
 // The client will return an error if unable to load a local .kubeconfig or .flowrc file
 func CreateDefaultClient() (*Client, error) {
 	var kubeconfigPath string
@@ -101,7 +103,7 @@ func CreateDefaultClient() (*Client, error) {
 	return CreateClient(kubeconfigPath, flowRC, configOverrides)
 }
 
-// Creates a new client for communicating with the Kubernetes cluster
+// CreateClient creates a new client for communicating with the Kubernetes cluster
 func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.ConfigOverrides) (*Client, error) {
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
@@ -135,7 +137,7 @@ func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.Co
 	return client, nil
 }
 
-// Portforward a pod with the given ports
+// Forward port forwards a pod with the given ports
 func (c *Client) Forward(podName string, ports []string) error {
 	roundTripper, upgrader, err := spdy.RoundTripperFor(c.restclient)
 	if err != nil {
@@ -164,6 +166,7 @@ func (c *Client) Forward(podName string, ports []string) error {
 	return nil
 }
 
+// Watch returns a watch.Interface that watches the requested pods.
 func (c *Client) Watch(listOptions metav1.ListOptions, f func(*v1.Pod, watch.EventType) error) error {
 	pods, err := c.Pods(c.GetCurrentNamespace()).Watch(context.TODO(), listOptions)
 	if err != nil {
@@ -185,7 +188,7 @@ func (c *Client) Watch(listOptions metav1.ListOptions, f func(*v1.Pod, watch.Eve
 	}
 }
 
-// Set the current context (does not save to file)
+// SetContext sets the current context (does not save to file)
 func (c *Client) SetContext(ctx string) error {
 	restClientConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: c.KubeconfigPath},
@@ -208,7 +211,7 @@ func (c *Client) SetContext(ctx string) error {
 	return nil
 }
 
-// Get current context from .kubeconfig or .flowrc
+// GetCurrentContext gets current context from .kubeconfig or .flowrc
 func (c *Client) GetCurrentContext() string {
 	if c.flowRC != nil {
 		return c.flowRC.Context
@@ -217,7 +220,7 @@ func (c *Client) GetCurrentContext() string {
 	return c.kubeconfigCurrentContext
 }
 
-// Get the namespace of the current context from .kubeconfig or .flowrc
+// GetCurrentNamespace gets the namespace of the current context from .kubeconfig or .flowrc
 func (c *Client) GetCurrentNamespace() string {
 	if c.flowRC != nil {
 		return c.flowRC.Namespace
@@ -226,11 +229,12 @@ func (c *Client) GetCurrentNamespace() string {
 	return c.Contexts[c.GetCurrentContext()].Namespace
 }
 
-// Get the name of the current cluster from .kubeconfig or .flowrc
+// GetCurrentCluster gets the name of the current cluster from .kubeconfig or .flowrc
 func (c *Client) GetCurrentCluster() string {
 	return c.Contexts[c.GetCurrentContext()].Cluster
 }
 
+// ProxyClient is used to send proxy HTTP requests to a pod running in the cluster
 type ProxyClient struct {
 	config     *restclient.Config
 	restclient restclient.Interface
@@ -240,7 +244,7 @@ type ProxyClient struct {
 	Resource   string
 }
 
-// Create a proxy allowing you to proxy HTTP requests to a given pod
+// Proxy creates a ProxyClient allowing you to proxy HTTP requests to a resource running in the cluster
 func (c *Client) Proxy(namespace, resource, name string) *ProxyClient {
 	return &ProxyClient{
 		config:     c.restclient,
@@ -252,6 +256,7 @@ func (c *Client) Proxy(namespace, resource, name string) *ProxyClient {
 	}
 }
 
+// ProxyPod creates a ProxyClient allowing you to proxy HTTP requests to a pod running in the cluster
 func (c *Client) ProxyPod(namespace, podName string) *ProxyClient {
 	return &ProxyClient{
 		config:     c.restclient,
@@ -263,6 +268,7 @@ func (c *Client) ProxyPod(namespace, podName string) *ProxyClient {
 	}
 }
 
+// ProxyService creates a ProxyClient allowing you to proxy HTTP requests to a service running in the cluster
 func (c *Client) ProxyService(namespace, serviceName string) *ProxyClient {
 	return &ProxyClient{
 		config:     c.restclient,
@@ -284,6 +290,7 @@ func setAdditionalRequestHeaders(req *rest.Request, additionalHeaders map[string
 	return req
 }
 
+// Get sends a proxied HTTP GET request to a specific resource running in the cluster
 func (p *ProxyClient) Get(endpoint string, additionalHeaders map[string]string) restclient.Result {
 	req := p.restclient.Get().Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint)
 	setAdditionalRequestHeaders(req, additionalHeaders)
@@ -291,6 +298,7 @@ func (p *ProxyClient) Get(endpoint string, additionalHeaders map[string]string) 
 	return req.Do(context.TODO())
 }
 
+// Put sends a proxied HTTP PUT request to a specific resource running in the cluster
 func (p *ProxyClient) Put(endpoint string, body interface{}, additionalHeaders map[string]string) restclient.Result {
 	// FIXME: Throttle should not be forced to nil here
 	req := p.restclient.Put().Throttle(nil).Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).Body(body)
@@ -299,6 +307,7 @@ func (p *ProxyClient) Put(endpoint string, body interface{}, additionalHeaders m
 	return req.Do(context.TODO())
 }
 
+// Post sends a proxied HTTP POST request to a specific resource running in the cluster
 func (p *ProxyClient) Post(endpoint string, body interface{}, additionalHeaders map[string]string) restclient.Result {
 	req := p.restclient.Post().Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).Body(body)
 	setAdditionalRequestHeaders(req, additionalHeaders)
@@ -306,6 +315,7 @@ func (p *ProxyClient) Post(endpoint string, body interface{}, additionalHeaders 
 	return req.Do(context.TODO())
 }
 
+// Delete sends a proxied HTTP DELETE request to a specific resource running in the cluster
 func (p *ProxyClient) Delete(endpoint string, additionalHeaders map[string]string) restclient.Result {
 	req := p.restclient.Delete().Resource(p.Resource).Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint)
 	setAdditionalRequestHeaders(req, additionalHeaders)
@@ -322,7 +332,7 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	return nil, nil
 }
 
-// Create a new websocket connection to a given pod
+// Websocket creates a new websocket connection to a given pod
 func (p *ProxyClient) Websocket(endpoint string) (*websocket.Conn, error) {
 	proxyUrl := p.restclient.Get().Resource("pods").Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).URL().String()
 	websocketUrl := fmt.Sprintf("wss://%s", strings.TrimPrefix(strings.TrimPrefix(proxyUrl, "https://"), "http://"))
