@@ -23,7 +23,7 @@ type ProxyClient struct {
 // Proxy creates a ProxyClient allowing you to proxy HTTP requests to a resource running in the cluster
 func (c *Client) Proxy(namespace, resource, name string) *ProxyClient {
 	return &ProxyClient{
-		config:     c.restclient,
+		config:     c.RESTConfig,
 		restclient: c.RESTClient(),
 		server:     c.Clusters[c.Contexts[c.GetCurrentContext()].Cluster].Server,
 		Namespace:  namespace,
@@ -35,7 +35,7 @@ func (c *Client) Proxy(namespace, resource, name string) *ProxyClient {
 // ProxyPod creates a ProxyClient allowing you to proxy HTTP requests to a pod running in the cluster
 func (c *Client) ProxyPod(namespace, podName string) *ProxyClient {
 	return &ProxyClient{
-		config:     c.restclient,
+		config:     c.RESTConfig,
 		restclient: c.RESTClient(),
 		server:     c.Clusters[c.Contexts[c.GetCurrentContext()].Cluster].Server,
 		Namespace:  namespace,
@@ -47,7 +47,7 @@ func (c *Client) ProxyPod(namespace, podName string) *ProxyClient {
 // ProxyService creates a ProxyClient allowing you to proxy HTTP requests to a service running in the cluster
 func (c *Client) ProxyService(namespace, serviceName string) *ProxyClient {
 	return &ProxyClient{
-		config:     c.restclient,
+		config:     c.RESTConfig,
 		restclient: c.RESTClient(),
 		server:     c.Clusters[c.Contexts[c.GetCurrentContext()].Cluster].Server,
 		Namespace:  namespace,

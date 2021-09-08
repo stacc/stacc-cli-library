@@ -30,9 +30,9 @@ type Client struct {
 	Clusters                 map[string]*clientcmdapi.Cluster
 	AuthInfos                map[string]*clientcmdapi.AuthInfo
 	Contexts                 map[string]*clientcmdapi.Context
+	RESTConfig               *restclient.Config
 	kubeconfigCurrentContext string
 	flowRC                   *FlowRC
-	restclient               *restclient.Config
 }
 
 // CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
@@ -129,13 +129,13 @@ func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.Co
 	client.CoreV1Interface = k8sClient.CoreV1()
 	client.kubeconfigCurrentContext = k8sConfig.CurrentContext
 	client.flowRC = flowRC
-	client.restclient = restClientConfig
+	client.RESTConfig = restClientConfig
 	return client, nil
 }
 
 // Forward port forwards a pod with the given ports
 func (c *Client) Forward(podName string, ports []string) error {
-	roundTripper, upgrader, err := spdy.RoundTripperFor(c.restclient)
+	roundTripper, upgrader, err := spdy.RoundTripperFor(c.RESTConfig)
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func (c *Client) SetContext(ctx string) error {
 		return err
 	}
 
-	c.restclient = restClientConfig
+	c.RESTConfig = restClientConfig
 	c.CoreV1Interface = k8sClient.CoreV1()
 
 	return nil
