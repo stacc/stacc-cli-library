@@ -334,10 +334,10 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // Websocket creates a new websocket connection to a given pod
 func (p *ProxyClient) Websocket(endpoint string) (*websocket.Conn, error) {
-	proxyUrl := p.restclient.Get().Resource("pods").Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).URL().String()
-	websocketUrl := fmt.Sprintf("wss://%s", strings.TrimPrefix(strings.TrimPrefix(proxyUrl, "https://"), "http://"))
+	proxyURL := p.restclient.Get().Resource("pods").Namespace(p.Namespace).Name(p.Name).SubResource("proxy").Suffix(endpoint).URL().String()
+	websocketURL := fmt.Sprintf("wss://%s", strings.TrimPrefix(strings.TrimPrefix(proxyURL, "https://"), "http://"))
 
-	wsc, err := websocket.NewConfig(websocketUrl, websocketUrl)
+	wsc, err := websocket.NewConfig(websocketURL, websocketURL)
 	if err != nil {
 		return nil, err
 	}
