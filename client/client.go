@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -183,7 +184,15 @@ func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.Co
 }
 
 // Forward port forwards a pod with the given ports
-func (c *Client) Forward(podName string, ports []string) error {
+func (c *Client) Forward(podName string, ports []string, out, errOut io.Writer) error {
+	if out == nil {
+		out = os.Stdout
+	}
+
+	if errOut == nil {
+		errOut = os.Stderr
+	}
+
 	roundTripper, upgrader, err := spdy.RoundTripperFor(c.RESTConfig)
 	if err != nil {
 		return err
@@ -199,7 +208,7 @@ func (c *Client) Forward(podName string, ports []string) error {
 
 	stopChan, readyChan := make(chan struct{}, 1), make(chan struct{}, 1)
 
-	forwarder, err := portforward.New(dialer, ports, stopChan, readyChan, os.Stdout, os.Stderr)
+	forwarder, err := portforward.New(dialer, ports, stopChan, readyChan, out, errOut)
 	if err != nil {
 		return err
 	}
