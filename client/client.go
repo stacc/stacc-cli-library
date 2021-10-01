@@ -2,12 +2,17 @@ package client
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"golang.org/x/oauth2"
 
 	// IMPORT REQUIRED TO REGISTER OIDC AS AN AUTH PROVIDER
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -112,6 +117,47 @@ func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.Co
 	k8sConfig, err := clientConfig.RawConfig()
 	if err != nil {
 		return nil, err
+	}
+
+	// Refresh OIDC tokens
+	if ctx, ok := k8sConfig.Contexts[k8sConfig.CurrentContext]; ok {
+		if authInfo, ok := k8sConfig.AuthInfos[ctx.AuthInfo]; ok && authInfo.AuthProvider != nil && authInfo.AuthProvider.Name == "oidc" {
+			conf := authInfo.AuthProvider.Config
+			isTokenValid, err := isTokenValid(conf)
+			if err != nil {
+				return nil, err
+			}
+
+			if refreshToken, ok := conf["refresh-token"]; ok && !isTokenValid {
+				oauthConfig := oauth2.Config{
+					ClientID:     conf["client-id"],
+					ClientSecret: conf["client-secret"],
+					Endpoint:     oauth2.Endpoint{TokenURL: fmt.Sprintf("%s/connect/token", conf["idp-issuer-url"])},
+				}
+
+				token, err := oauthConfig.TokenSource(context.TODO(), &oauth2.Token{RefreshToken: refreshToken}).Token()
+				if err != nil {
+					return nil, err
+				}
+
+				newConfig := make(map[string]string)
+				for k, v := range conf {
+					newConfig[k] = v
+				}
+
+				if token.RefreshToken != "" {
+					newConfig["refresh-token"] = token.RefreshToken
+				}
+
+				newConfig["id-token"] = token.Extra("id_token").(string)
+				persister := clientcmd.PersisterForUser(clientConfig.ConfigAccess(), ctx.AuthInfo)
+				if err = persister.Persist(newConfig); err != nil {
+					return nil, err
+				}
+
+				authInfo.AuthProvider.Config = newConfig
+			}
+		}
 	}
 
 	restClientConfig, err := clientConfig.ClientConfig()
@@ -231,4 +277,27 @@ func (c *Client) GetCurrentNamespace() string {
 // GetCurrentCluster gets the name of the current cluster from .kubeconfig or .flowrc
 func (c *Client) GetCurrentCluster() string {
 	return c.Contexts[c.GetCurrentContext()].Cluster
+}
+
+func isTokenValid(conf map[string]string) (bool, error) {
+	idToken, ok := conf["id-token"]
+	if !ok {
+		return false, nil
+	}
+
+	split := strings.Split(idToken, ".")
+
+	data, err := base64.RawURLEncoding.DecodeString(split[1])
+	if err != nil {
+		return false, err
+	}
+
+	var dataStruct struct {
+		Expiry int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(data, &dataStruct); err != nil {
+		return false, err
+	}
+
+	return time.Now().Add(10 * time.Second).Before(time.Unix(dataStruct.Expiry, 0)), nil
 }
