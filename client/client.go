@@ -47,21 +47,27 @@ type Client struct {
 // CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
 // The client will return an error if unable to load a local .kubeconfig or .flowrc file
 func CreateDefaultClient() (*Client, error) {
-	var kubeconfigPath string
 	var flowRC *FlowRC = nil
 	var configOverrides *clientcmd.ConfigOverrides = nil
 
-	localKubeconfigAbsPath, err := filepath.Abs(".kubeconfig")
+	defaultKubeconfigPath := ".kubeconfig"
+
+	staccKubeconfigEnv := os.Getenv("STACC_KUBECONFIG")
+	if staccKubeconfigEnv != "" {
+		defaultKubeconfigPath = staccKubeconfigEnv
+	}
+
+	localKubeconfigAbsPath, err := filepath.Abs(defaultKubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
 
+	var kubeconfigPath string
 	info, err := os.Stat(localKubeconfigAbsPath)
 	if err == nil {
 		if info.IsDir() {
 			return nil, fmt.Errorf("client: %s is dir", localKubeconfigAbsPath)
 		}
-
 		kubeconfigPath = localKubeconfigAbsPath
 	} else if os.IsNotExist(err) {
 		home := homedir.HomeDir()
@@ -73,7 +79,6 @@ func CreateDefaultClient() (*Client, error) {
 			if os.IsNotExist(err) {
 				return nil, fmt.Errorf("client: run stacc login")
 			}
-
 			return nil, err
 		}
 
