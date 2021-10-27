@@ -52,8 +52,10 @@ func CreateDefaultClient() (*Client, error) {
 
 	defaultKubeconfigPath := ".kubeconfig"
 
+	var useEnvVar bool
 	staccKubeconfigEnv := os.Getenv("STACC_KUBECONFIG")
 	if staccKubeconfigEnv != "" {
+		useEnvVar = true
 		defaultKubeconfigPath = staccKubeconfigEnv
 	}
 
@@ -70,6 +72,10 @@ func CreateDefaultClient() (*Client, error) {
 		}
 		kubeconfigPath = localKubeconfigAbsPath
 	} else if os.IsNotExist(err) {
+		if useEnvVar {
+			return nil, fmt.Errorf("client: STACC_KUBECONFIG environment variable is set to %s, but this file does not exist", localKubeconfigAbsPath)
+		}
+
 		home := homedir.HomeDir()
 		kubeconfigPath = filepath.Join(home, ".kube", "config")
 
