@@ -11,7 +11,7 @@ Then install with `$ go get github.com/stacc/stacc-cli-library`
 ## Examples
 
 ```
-// Create a default client for communicating with the Kubernetes cluster by loading local .kubeconfig or .flowrc files
+// Create a default client for communicating with the Kubernetes cluster by loading local .kubeconfig files
 client, err := CreateDefaultClient()
 if err != nil {
   log.Fatal(err.Error())

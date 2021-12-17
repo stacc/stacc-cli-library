@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,10 +27,9 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/client-go/util/homedir"
 )
 
-// Client is used to load .kubeconfig and .flowrc files and
+// Client is used to load .kubeconfig files and
 // communicate with the Kubernetes API
 type Client struct {
 	corev1.CoreV1Interface
@@ -41,13 +39,11 @@ type Client struct {
 	Contexts                 map[string]*clientcmdapi.Context
 	RESTConfig               *restclient.Config
 	kubeconfigCurrentContext string
-	flowRC                   *FlowRC
 }
 
 // CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
-// The client will return an error if unable to load a local .kubeconfig or .flowrc file
+// The client will return an error if unable to load a local .kubeconfig file
 func CreateDefaultClient() (*Client, error) {
-	var flowRC *FlowRC = nil
 	var configOverrides *clientcmd.ConfigOverrides = nil
 
 	defaultKubeconfigPath := ".kubeconfig"
@@ -64,6 +60,16 @@ func CreateDefaultClient() (*Client, error) {
 		return nil, err
 	}
 
+	flowRCAbsPath, err := filepath.Abs(".flowrc")
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = os.Stat(flowRCAbsPath)
+	if os.IsNotExist(err) {
+		fmt.Println("WARNING: .flowrc is deprecated and should be removed")
+	}
+
 	var kubeconfigPath string
 	info, err := os.Stat(localKubeconfigAbsPath)
 	if err == nil {
@@ -71,56 +77,17 @@ func CreateDefaultClient() (*Client, error) {
 			return nil, fmt.Errorf("client: %s is dir", localKubeconfigAbsPath)
 		}
 		kubeconfigPath = localKubeconfigAbsPath
-	} else if os.IsNotExist(err) {
-		if useEnvVar {
-			return nil, fmt.Errorf("client: STACC_KUBECONFIG environment variable is set to %s, but this file does not exist", localKubeconfigAbsPath)
-		}
-
-		home := homedir.HomeDir()
-		kubeconfigPath = filepath.Join(home, ".kube", "config")
-
-		flowRCAbsPath, err := filepath.Abs(".flowrc")
-		flowRCInfo, err := os.Stat(flowRCAbsPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil, fmt.Errorf("client: credentials not found, run stacc connect")
-			}
-			return nil, err
-		}
-
-		if flowRCInfo.IsDir() {
-			return nil, fmt.Errorf("client: %s is dir", flowRCAbsPath)
-		}
-
-		flowRCBytes, err := ioutil.ReadFile(flowRCAbsPath)
-		if err != nil {
-			return nil, err
-		}
-
-		flowRC = &FlowRC{}
-		err = json.Unmarshal(flowRCBytes, flowRC)
-		if err != nil {
-			return nil, err
-		}
-
-		if flowRC.Context == "" {
-			return nil, fmt.Errorf("client: .flowrc has no configured context")
-		}
-
-		if flowRC.Namespace == "" {
-			return nil, fmt.Errorf("client: .flowrc has no configured namespace")
-		}
-
-		configOverrides = &clientcmd.ConfigOverrides{CurrentContext: flowRC.Context}
+	} else if os.IsNotExist(err) && useEnvVar {
+		return nil, fmt.Errorf("client: STACC_KUBECONFIG environment variable is set to %s, but this file does not exist", localKubeconfigAbsPath)
 	} else {
 		return nil, err
 	}
 
-	return CreateClient(kubeconfigPath, flowRC, configOverrides)
+	return CreateClient(kubeconfigPath, configOverrides)
 }
 
 // CreateClient creates a new client for communicating with the Kubernetes cluster
-func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.ConfigOverrides) (*Client, error) {
+func CreateClient(kubeconfigPath string, overrides *clientcmd.ConfigOverrides) (*Client, error) {
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		overrides,
@@ -189,7 +156,6 @@ func CreateClient(kubeconfigPath string, flowRC *FlowRC, overrides *clientcmd.Co
 	client.Contexts = k8sConfig.Contexts
 	client.CoreV1Interface = k8sClient.CoreV1()
 	client.kubeconfigCurrentContext = k8sConfig.CurrentContext
-	client.flowRC = flowRC
 	client.RESTConfig = restClientConfig
 	return client, nil
 }
@@ -276,25 +242,17 @@ func (c *Client) SetContext(ctx string) error {
 	return nil
 }
 
-// GetCurrentContext gets current context from .kubeconfig or .flowrc
+// GetCurrentContext gets current context from .kubeconfig
 func (c *Client) GetCurrentContext() string {
-	if c.flowRC != nil {
-		return c.flowRC.Context
-	}
-
 	return c.kubeconfigCurrentContext
 }
 
-// GetCurrentNamespace gets the namespace of the current context from .kubeconfig or .flowrc
+// GetCurrentNamespace gets the namespace of the current context from .kubeconfig
 func (c *Client) GetCurrentNamespace() string {
-	if c.flowRC != nil {
-		return c.flowRC.Namespace
-	}
-
 	return c.Contexts[c.GetCurrentContext()].Namespace
 }
 
-// GetCurrentCluster gets the name of the current cluster from .kubeconfig or .flowrc
+// GetCurrentCluster gets the name of the current cluster from .kubeconfig
 func (c *Client) GetCurrentCluster() string {
 	return c.Contexts[c.GetCurrentContext()].Cluster
 }
