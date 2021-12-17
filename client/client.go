@@ -66,7 +66,7 @@ func CreateDefaultClient() (*Client, error) {
 	}
 
 	_, err = os.Stat(flowRCAbsPath)
-	if err != nil {
+	if err == nil {
 		fmt.Println("WARNING: .flowrc is deprecated and should be removed")
 	}
 
