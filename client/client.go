@@ -83,7 +83,7 @@ func CreateDefaultClient() (*Client, error) {
 		flowRCInfo, err := os.Stat(flowRCAbsPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return nil, fmt.Errorf("client: run stacc login")
+				return nil, fmt.Errorf("client: credentials not found, run stacc connect")
 			}
 			return nil, err
 		}
