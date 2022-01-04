@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -116,7 +117,14 @@ func CreateClient(kubeconfigPath string, overrides *clientcmd.ConfigOverrides) (
 
 				token, err := oauthConfig.TokenSource(context.TODO(), &oauth2.Token{RefreshToken: refreshToken}).Token()
 				if err != nil {
-					return nil, err
+					var e *oauth2.RetrieveError
+					if errors.As(err, &e) {
+						if strings.HasSuffix(err.Error(), `{"error":"invalid_grant"}`) {
+							return nil, fmt.Errorf("failed to refresh credentials for environment, please run 'stacc connect'")
+						}
+					} else {
+						return nil, err
+					}
 				}
 
 				newConfig := make(map[string]string)
