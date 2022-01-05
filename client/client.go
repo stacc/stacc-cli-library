@@ -119,7 +119,7 @@ func CreateClient(kubeconfigPath string, overrides *clientcmd.ConfigOverrides) (
 				if err != nil {
 					var e *oauth2.RetrieveError
 					if errors.As(err, &e) {
-						if strings.HasSuffix(err.Error(), `{"error":"invalid_grant"}`) {
+						if strings.Contains(err.Error(), "invalid_grant") {
 							return nil, fmt.Errorf("failed to refresh credentials for environment, please run 'stacc connect'")
 						}
 					}
