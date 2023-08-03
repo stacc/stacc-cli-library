@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"golang.org/x/oauth2"
 
 	// IMPORT REQUIRED TO REGISTER OIDC AS AN AUTH PROVIDER
@@ -42,11 +43,11 @@ type Client struct {
 	kubeconfigCurrentContext string
 }
 
-// CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
-// The client will return an error if unable to load a local .kubeconfig file
-func CreateDefaultClient() (*Client, error) {
-	var configOverrides *clientcmd.ConfigOverrides = nil
-
+// FindKubeconfigPath returns the absolute path to a kubeconfig file.
+//
+// Uses the "STACC_KUBECONFIG" envvar if set, if not checks if the file
+// exists in the current directory.
+func FindKubeconfigPath() (string, error) {
 	defaultKubeconfigPath := ".kubeconfig"
 
 	var useEnvVar bool
@@ -58,29 +59,46 @@ func CreateDefaultClient() (*Client, error) {
 
 	localKubeconfigAbsPath, err := filepath.Abs(defaultKubeconfigPath)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	flowRCAbsPath, err := filepath.Abs(".flowrc")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	_, err = os.Stat(flowRCAbsPath)
 	if err == nil {
-		fmt.Println("WARNING: .flowrc is deprecated and should be removed")
+		color.Yellow("WARNING: .flowrc is deprecated and should be removed")
 	}
 
-	var kubeconfigPath string
 	info, err := os.Stat(localKubeconfigAbsPath)
-	if err == nil {
-		if info.IsDir() {
-			return nil, fmt.Errorf("client: %s is dir", localKubeconfigAbsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if useEnvVar {
+				color.Red("\"STACC_KUBECONFIG\" environment variable is set to %q, but this file does not exist", localKubeconfigAbsPath)
+			} else {
+				color.Red("No \".kubeconfig\" file found in current directory %q", filepath.Dir(localKubeconfigAbsPath))
+				color.Red("Make sure you are in the correct directory, or set the \"STACC_KUBECONFIG\" environment variable to reference the correct file")
+			}
 		}
-		kubeconfigPath = localKubeconfigAbsPath
-	} else if os.IsNotExist(err) && useEnvVar {
-		return nil, fmt.Errorf("client: STACC_KUBECONFIG environment variable is set to %s, but this file does not exist", localKubeconfigAbsPath)
-	} else {
+		return "", err
+	}
+
+	if info.IsDir() {
+		return "", fmt.Errorf("client: %q is a directory", localKubeconfigAbsPath)
+	}
+
+	return localKubeconfigAbsPath, nil
+}
+
+// CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
+// The client will return an error if unable to load a local .kubeconfig file
+func CreateDefaultClient() (*Client, error) {
+	var configOverrides *clientcmd.ConfigOverrides = nil
+
+	kubeconfigPath, err := FindKubeconfigPath()
+	if err != nil {
 		return nil, err
 	}
 
