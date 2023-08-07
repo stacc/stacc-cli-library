@@ -9,11 +9,9 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"golang.org/x/oauth2"
 
 	// IMPORT REQUIRED TO REGISTER OIDC AS AN AUTH PROVIDER
@@ -43,61 +41,12 @@ type Client struct {
 	kubeconfigCurrentContext string
 }
 
-// FindKubeconfigPath returns the absolute path to a kubeconfig file.
-//
-// Uses the "STACC_KUBECONFIG" envvar if set, if not checks if the file
-// exists in the current directory.
-func FindKubeconfigPath() (string, error) {
-	defaultKubeconfigPath := ".kubeconfig"
-
-	var useEnvVar bool
-	staccKubeconfigEnv := os.Getenv("STACC_KUBECONFIG")
-	if staccKubeconfigEnv != "" {
-		useEnvVar = true
-		defaultKubeconfigPath = staccKubeconfigEnv
-	}
-
-	localKubeconfigAbsPath, err := filepath.Abs(defaultKubeconfigPath)
-	if err != nil {
-		return "", err
-	}
-
-	flowRCAbsPath, err := filepath.Abs(".flowrc")
-	if err != nil {
-		return "", err
-	}
-
-	_, err = os.Stat(flowRCAbsPath)
-	if err == nil {
-		color.Yellow("WARNING: .flowrc is deprecated and should be removed")
-	}
-
-	info, err := os.Stat(localKubeconfigAbsPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			if useEnvVar {
-				color.Red("\"STACC_KUBECONFIG\" environment variable is set to %q, but this file does not exist", localKubeconfigAbsPath)
-			} else {
-				color.Red("No \".kubeconfig\" file found in current directory %q", filepath.Dir(localKubeconfigAbsPath))
-				color.Red("Make sure you are in the correct directory, or set the \"STACC_KUBECONFIG\" environment variable to reference the correct file")
-			}
-		}
-		return "", err
-	}
-
-	if info.IsDir() {
-		return "", fmt.Errorf("client: %q is a directory", localKubeconfigAbsPath)
-	}
-
-	return localKubeconfigAbsPath, nil
-}
-
 // CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
 // The client will return an error if unable to load a local .kubeconfig file
 func CreateDefaultClient() (*Client, error) {
 	var configOverrides *clientcmd.ConfigOverrides = nil
 
-	kubeconfigPath, err := FindKubeconfigPath()
+	kubeconfigPath, err := LookupKubeconfigPath()
 	if err != nil {
 		return nil, err
 	}
