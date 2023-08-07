@@ -75,6 +75,22 @@ func LookupKubeconfigPath(options ...KubeconfigPathOption) (string, error) {
 	return kubeconfigPath, nil
 }
 
+// GetKubeconfigPath returns the path to a kubeconfig file.
+// Returns the value of the "STACC_KUBECONFIG" environment variable,
+// if it exists. Defaults to the absolute path to "<current-directory>/.kubeconfig".
+func GetKubeconfigPath() (string, error) {
+	staccKubeconfigEnv := os.Getenv("STACC_KUBECONFIG")
+	if staccKubeconfigEnv != "" {
+		return staccKubeconfigEnv, nil
+	} else {
+		kubeconfigPath, err := filepath.Abs(DEFAULT_KUBECONFIG_PATH)
+		if err != nil {
+			return "", err
+		}
+		return kubeconfigPath, nil
+	}
+}
+
 func reportFlowRCDeprecated() {
 	flowRCAbsPath, err := filepath.Abs(".flowrc")
 	if err != nil {
