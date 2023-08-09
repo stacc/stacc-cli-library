@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -41,12 +42,32 @@ type Client struct {
 	kubeconfigCurrentContext string
 }
 
+const DEFAULT_KUBECONFIG_PATH = ".kubeconfig"
+
+// GetKubeconfigPath returns the path to a kubeconfig file.
+// Returns the value of the "STACC_KUBECONFIG" environment variable
+// if it exists. Defaults to the absolute path to "<current-directory>/.kubeconfig".
+//
+// NOTE: This function doesn't check if the file actually exists.
+func GetKubeconfigPath() (string, error) {
+	if staccKubeconfigEnv, ok := os.LookupEnv("STACC_KUBECONFIG"); ok {
+		return staccKubeconfigEnv, nil
+	}
+
+	kubeconfigPath, err := filepath.Abs(DEFAULT_KUBECONFIG_PATH)
+	if err != nil {
+		return "", err
+	}
+
+	return kubeconfigPath, nil
+}
+
 // CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
 // The client will return an error if unable to load a local .kubeconfig file
 func CreateDefaultClient() (*Client, error) {
 	var configOverrides *clientcmd.ConfigOverrides = nil
 
-	kubeconfigPath, err := LookupKubeconfigPath()
+	kubeconfigPath, err := GetKubeconfigPath()
 	if err != nil {
 		return nil, err
 	}
