@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"golang.org/x/oauth2"
 
 	// IMPORT REQUIRED TO REGISTER OIDC AS AN AUTH PROVIDER
@@ -43,53 +42,24 @@ type Client struct {
 	kubeconfigCurrentContext string
 }
 
-// FindKubeconfigPath returns the absolute path to a kubeconfig file.
+const DEFAULT_KUBECONFIG_PATH = ".kubeconfig"
+
+// GetKubeconfigPath returns the path to a kubeconfig file.
+// Returns the value of the "STACC_KUBECONFIG" environment variable
+// if it exists. Defaults to the absolute path to "<current-directory>/.kubeconfig".
 //
-// Uses the "STACC_KUBECONFIG" envvar if set, if not checks if the file
-// exists in the current directory.
-func FindKubeconfigPath() (string, error) {
-	defaultKubeconfigPath := ".kubeconfig"
-
-	var useEnvVar bool
-	staccKubeconfigEnv := os.Getenv("STACC_KUBECONFIG")
-	if staccKubeconfigEnv != "" {
-		useEnvVar = true
-		defaultKubeconfigPath = staccKubeconfigEnv
+// NOTE: This function doesn't check if the file actually exists.
+func GetKubeconfigPath() (string, error) {
+	if staccKubeconfigEnv, ok := os.LookupEnv("STACC_KUBECONFIG"); ok {
+		return staccKubeconfigEnv, nil
 	}
 
-	localKubeconfigAbsPath, err := filepath.Abs(defaultKubeconfigPath)
+	kubeconfigPath, err := filepath.Abs(DEFAULT_KUBECONFIG_PATH)
 	if err != nil {
 		return "", err
 	}
 
-	flowRCAbsPath, err := filepath.Abs(".flowrc")
-	if err != nil {
-		return "", err
-	}
-
-	_, err = os.Stat(flowRCAbsPath)
-	if err == nil {
-		color.Yellow("WARNING: .flowrc is deprecated and should be removed")
-	}
-
-	info, err := os.Stat(localKubeconfigAbsPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			if useEnvVar {
-				color.Red("\"STACC_KUBECONFIG\" environment variable is set to %q, but this file does not exist", localKubeconfigAbsPath)
-			} else {
-				color.Red("No \".kubeconfig\" file found in current directory %q", filepath.Dir(localKubeconfigAbsPath))
-				color.Red("Make sure you are in the correct directory, or set the \"STACC_KUBECONFIG\" environment variable to reference the correct file")
-			}
-		}
-		return "", err
-	}
-
-	if info.IsDir() {
-		return "", fmt.Errorf("client: %q is a directory", localKubeconfigAbsPath)
-	}
-
-	return localKubeconfigAbsPath, nil
+	return kubeconfigPath, nil
 }
 
 // CreateDefaultClient creates a default client for communicating with the Kubernetes cluster
@@ -97,7 +67,7 @@ func FindKubeconfigPath() (string, error) {
 func CreateDefaultClient() (*Client, error) {
 	var configOverrides *clientcmd.ConfigOverrides = nil
 
-	kubeconfigPath, err := FindKubeconfigPath()
+	kubeconfigPath, err := GetKubeconfigPath()
 	if err != nil {
 		return nil, err
 	}
